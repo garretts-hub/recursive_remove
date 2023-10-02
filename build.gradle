@@ -1,7 +1,25 @@
 import java.nio.file.Files
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING
+buildscript {
 
-apply plugin: 'java'
+    repositories {
+        mavenCentral()
+
+        maven {
+            url 'https://plugins.gradle.org/m2/'
+        }
+    }
+    dependencies {
+        classpath 'com.github.johnrengelman:shadow:8.1.1'
+    }
+}
+
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'idea'
+}
+
 apply from: LOGSTASH_CORE_PATH + "/../rubyUtils.gradle"
 
 // ===========================================================================
@@ -9,50 +27,102 @@ apply from: LOGSTASH_CORE_PATH + "/../rubyUtils.gradle"
 // ===========================================================================
 group                      'org.logstashplugins' // must match the package of the main plugin class
 version                    "${file("VERSION").text.trim()}" // read from required VERSION file
-description                = "Example Java filter implementation"
+description                = "Java filter used to remove arbitrary event fields, including nested fields, that match a list of values"
 pluginInfo.licenses        = ['Apache-2.0'] // list of SPDX license IDs
 pluginInfo.longDescription = "This gem is a Logstash plugin required to be installed on top of the Logstash core pipeline using \$LS_HOME/bin/logstash-plugin install gemname. This gem is not a stand-alone program"
-pluginInfo.authors         = ['Elasticsearch']
-pluginInfo.email           = ['info@elastic.co']
+pluginInfo.authors         = ['Garrett Simon']
+pluginInfo.email           = ['gk.simon04@gmail.com']
 pluginInfo.homepage        = "http://www.elastic.co/guide/en/logstash/current/index.html"
 pluginInfo.pluginType      = "filter"
-pluginInfo.pluginClass     = "JavaFilterExample"
-pluginInfo.pluginName      = "java_filter_example" // must match the @LogstashPlugin annotation in the main plugin class
+pluginInfo.pluginClass     = "RecursiveRemove"
+pluginInfo.pluginName      = "recursive_remove" // must match the @LogstashPlugin annotation in the main plugin class
 // ===========================================================================
-
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
-
-buildscript {
-    repositories {
-        mavenCentral()
-        jcenter()
-    }
-
-    dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.4'
-    }
+java {
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
 }
 
 repositories {
     mavenCentral()
+    flatDir {
+        dirs LOGSTASH_CORE_LIBS
+    }
 }
-
-apply plugin: 'com.github.johnrengelman.shadow'
 
 shadowJar {
     archiveClassifier = null
 }
+task sourcesJar(type: Jar, dependsOn: classes) {
+    from sourceSets.main.allSource
+    archiveClassifier = 'sources'
+    archiveExtension = 'jar'
+}
 
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    from javadoc.destinationDir
+    archiveClassifier = 'javadoc'
+    archiveExtension = 'jar'
+}
+
+configurations.create('sources')
+configurations.create('javadoc')
+configurations.archives {
+    extendsFrom configurations.sources
+    extendsFrom configurations.javadoc
+}
+
+artifacts {
+    sources(sourcesJar) {
+        // Weird Gradle quirk where type will be used for the extension, but only for sources
+        type 'jar'
+    }
+
+    javadoc(javadocJar) {
+        type 'javadoc'
+    }
+}
+
+configurations {
+    provided
+}
+
+project.sourceSets {
+    main.compileClasspath += project.configurations.provided
+    main.runtimeClasspath += project.configurations.provided
+    test.compileClasspath += project.configurations.provided
+    test.runtimeClasspath += project.configurations.provided
+}
+project.javadoc.classpath += project.configurations.provided
+
+idea {
+    module {
+        scopes.PROVIDED.plus += [project.configurations.provided]
+    }
+}
+
+// logstashCoreGemPath and logstashCoreEventGemPath comes from the gradle.properties file
+// the gradle.properties file is built by the Rake task bundle_install
+// See BUILD_INSTRUCTIONS.md
 dependencies {
+    provided group: "org.apache.logging.log4j", name: "log4j-api", version: "2.17.0"
+    provided group: "org.apache.logging.log4j", name: "log4j-core", version: "2.17.0"
+    provided 'org.jruby:jruby-core:9.2.20.1'
+    provided 'org.apache.commons:commons-lang3:3.7'
+    provided 'org.logstash:logstash-core:1.0.3'
+    testImplementation 'junit:junit:4.13.1'
+    testImplementation 'org.jruby:jruby-complete:9.2.20.1'
+}
+
+/*dependencies {
     implementation 'org.apache.commons:commons-lang3:3.7'
     compileOnly 'org.apache.logging.log4j:log4j-api:2.17.0' // provided by Logstash
     compileOnly 'org.apache.logging.log4j:log4j-core:2.17.0' // provided by Logstash
-    implementation fileTree(dir: LOGSTASH_CORE_PATH, include: "build/libs/logstash-core*.jar")
+    implementation 'org.logstash:logstash-core:1.0.3'
 
-    testImplementation 'junit:junit:4.12'
+    testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.jruby:jruby-complete:9.2.20.1'
-}
+    testImplementation 'org.logstash:logstash-core:1.0.3'
+}*/
 
 clean {
     delete "${projectDir}/Gemfile"
@@ -98,7 +168,7 @@ tasks.register("removeObsoleteJars") {
 }
 
 tasks.register("gem"){
-    dependsOn = [downloadAndInstallJRuby, removeObsoleteJars, vendor, generateRubySupportFiles]
+    dependsOn = [downloadAndInstallJRuby, removeObsoleteJars, generateRubySupportFiles]
     doLast {
         buildGem(projectDir, buildDir, pluginInfo.pluginFullName() + ".gemspec")
     }
