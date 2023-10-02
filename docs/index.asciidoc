@@ -1,4 +1,4 @@
-:plugin: example
+:plugin: recursive_remove
 :type: filter
 // Update header with plugin name
 
@@ -15,70 +15,92 @@ END - GENERATED VARIABLES, DO NOT EDIT!
 
 [id="plugins-{type}s-{plugin}"]
 
-=== Example filter plugin
+=== Recursive_remove filter plugin
 
 include::{include_path}/plugin_header.asciidoc[]
 
 ==== Description
 
-Add plugin description here
+Recursive remove filter. Arbitrarily remove any field in an event, including nested fields, if its value falls within specified blacklist of values.
+
+`recursive_remove` differs from `remove_field` and `prune` in that: +
+
+  . it recursively searches nested fields for matching values.
+  . it searches _all_ fields, with an option to exclude certain fields, versus specifying beforehand which fields to filter.
+
+In the example implementation of `recursive_remove` below, any event fields with a string value of `-` or numeric value of `0` will be dropped, unless the field is `inventory`:
+[source, ruby]
+filter {
+  recursive_remove {
+    matching_values => ["-", 0]
+    excluded_keys => ["inventory"]
+  }
+}
+
+For example, an input event of:
+[source, json]
+{
+  "name" : {
+    "scientific" : "-",
+    "common" : "banana"
+  },
+  "type": "fruit",
+  "color": "yellow",
+  "inventory": 0,
+  "weight": 0.000
+}
+
+will return an output event of:
+[source, json]
+{
+  "name" : {
+    "common" : "banana"
+  },
+  "type": "fruit",
+  "color": "yellow",
+  "inventory": 0
+}
 
 // Format anchors and links to support generated ids for versioning
 // Sample anchor: [id="plugins-{type}s-{plugin}-setting_name"]
 // Sample link: <<plugins-{type}s-{plugin}-setting_name>>
 
 [id="plugins-{type}s-{plugin}-options"]
-==== Example Filter Configuration Options
+==== Recursive_remove Configuration Options
 
 [cols="<,<,<",options="header",]
 |=======================================================================
 |Setting |Input type|Required
-| <<plugins-{type}s-{plugin}-a_setting_name>> |<<boolean,boolean>>|No
-| <<plugins-{type}s-{plugin}-another_setting_name>> |<<hash,hash>>|No
-| <<plugins-{type}s-{plugin}-setting_name_3>> |<<string,string>>|No
-| <<plugins-{type}s-{plugin}-setting_name_4>> |<<number,number>>|No
-| <<plugins-{type}s-{plugin}-setting_name_5>> |<<array,array>>|No
+| <<plugins-{type}s-{plugin}-matching_values>> |<<array,array>>|Yes
+| <<plugins-{type}s-{plugin}-excluded_keys>> |<<array,array>>|No
 |=======================================================================
 
-[id="plugins-{type}s-{plugin}-a_setting_name"]
-===== `a_setting_name` 
+Also see <<plugins-{type}s-{plugin}-common-options>> for a list of options supported by all
+filter plugins.
 
-  * Value type is <<boolean,boolean>>
-  * Default value is `true`
+&nbsp;
 
-Add description here
+[id="plugins-{type}s-{plugin}-matching_values"]
+===== `matching_values`
 
-[id="plugins-{type}s-{plugin}-another_setting_name"]
-===== `another_setting_name` 
+  * This is a required setting.
+  * Value type is <<array,array>>
+  * There is no default value for this setting.
 
-  * Value type is <<hash,hash>>
-  * Default value is `{}`
+An array input of values to blacklist. Can consist of mixed types. +
+ +
+All numeric values in this array and the event will be compared as doubles, so a `0`-valued integer or long in this argument will remove any event fields possessing a `0.00`-valued float or double.
 
-Add description here
-
-[id="plugins-{type}s-{plugin}-setting_name_3"]
-===== `setting_name_3` 
-
-  * Value type is <<string,string>>
-  * Default value is `{}`
-
-Add description here
-
-[id="plugins-{type}s-{plugin}-setting_name_4"]
-===== `setting_name_4` 
-
-  * Value type is <<number,number>>
-  * Default value is `0`
-
-Add description here
-
-[id="plugins-{type}s-{plugin}-setting_name_5"]
-===== `setting_name_5` 
+[id="plugins-{type}s-{plugin}-excluded_keys"]
+===== `excluded_keys`
 
   * Value type is <<array,array>>
-  * Default value is {}
+  * There is no default value for this setting.
 
-Add description here
+An optional array of string field names to exclude from blacklist value matching. If not specified, all fields will be searched. +
+ +
+This field supports Ruby nested fieldname strings, e.g.  (`"[rootfield][subfield][subsubfield]"`).
+
 
 // The full list of Value Types is here: 
 // https://www.elastic.co/guide/en/logstash/current/configuration-file-structure.html

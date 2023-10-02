@@ -9,6 +9,7 @@ import co.elastic.logstash.api.LogstashPlugin;
 import co.elastic.logstash.api.PluginConfigSpec;
 
 
+import java.math.BigDecimal;
 import java.util.*;
 
 // class name must match plugin name, excluding underscores and casings
@@ -61,18 +62,24 @@ public class RecursiveRemove implements Filter {
             String key = entry.getKey();
             String fullKeyString = fullKeyPrefix + "[" + key + "]";
             Object eventValue = inputEvent.getField(fullKeyString); //normal, non-jruby classes
-            //System.out.println(fullKeyString + ":" + eventValue + ":" + eventValue.getClass());
+
             if (excludedKeysArray.contains(key) || excludedKeysArray.contains(fullKeyString)) {
                 continue;
             }
+            //System.out.println("Before CONV: " + fullKeyString + ":" + eventValue + ":" + eventValue.getClass());
             // Convert numeric values to Doubles for matching with valuesArray
             if (eventValue.getClass() == Integer.class) {
                 eventValue = ((Integer) eventValue).doubleValue();
-            } else if (eventValue instanceof Float) {
+            } else if (eventValue.getClass() == Float.class) {
                 eventValue = ((Float) eventValue).doubleValue();
-            } else if (eventValue instanceof Long) {
+            } else if (eventValue.getClass() == Long.class) {
                 eventValue = ((Long) eventValue).doubleValue();
+            } else if (eventValue.getClass() == Double.class) {
+                eventValue = ((Double) eventValue).doubleValue();
+            } else if (eventValue.getClass() == BigDecimal.class) {
+                eventValue = ((BigDecimal) eventValue).doubleValue();
             }
+            //System.out.println("After CONV: " + fullKeyString + ":" + eventValue + ":" + eventValue.getClass());
             if (!(eventValue instanceof Map) && (valuesArray.contains(eventValue))) {
                 hasBadEntries = true;
                 inputEvent.remove(fullKeyString);
