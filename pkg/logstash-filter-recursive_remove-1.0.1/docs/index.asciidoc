@@ -1,0 +1,109 @@
+:plugin: recursive_remove
+:type: filter
+// Update header with plugin name
+
+///////////////////////////////////////////
+START - GENERATED VARIABLES, DO NOT EDIT!
+///////////////////////////////////////////
+:version: %VERSION%
+:release_date: %RELEASE_DATE%
+:changelog_url: %CHANGELOG_URL%
+:include_path: ../../../../logstash/docs/include
+///////////////////////////////////////////
+END - GENERATED VARIABLES, DO NOT EDIT!
+///////////////////////////////////////////
+
+[id="plugins-{type}s-{plugin}"]
+
+=== Recursive_remove filter plugin
+
+include::{include_path}/plugin_header.asciidoc[]
+
+==== Description
+
+Recursive remove filter. Arbitrarily remove any field in an event, including nested fields, if its value falls within specified blacklist of values.
+
+`recursive_remove` differs from `remove_field` and `prune` in that: +
+
+  . it recursively searches nested fields for matching values.
+  . it searches _all_ fields, with an option to exclude certain fields, versus specifying beforehand which fields to filter.
+
+In the example implementation of `recursive_remove` below, any event fields with a string value of `-` or numeric value of `0` will be dropped, unless the field is `inventory`:
+[source, ruby]
+filter {
+  recursive_remove {
+    matching_values => ["-", 0]
+    excluded_keys => ["inventory"]
+  }
+}
+
+For example, an input event of:
+[source, json]
+{
+  "name" : {
+    "scientific" : "-",
+    "common" : "banana"
+  },
+  "type": "fruit",
+  "color": "yellow",
+  "inventory": 0,
+  "weight": 0.000
+}
+
+will return an output event of:
+[source, json]
+{
+  "name" : {
+    "common" : "banana"
+  },
+  "type": "fruit",
+  "color": "yellow",
+  "inventory": 0
+}
+
+// Format anchors and links to support generated ids for versioning
+// Sample anchor: [id="plugins-{type}s-{plugin}-setting_name"]
+// Sample link: <<plugins-{type}s-{plugin}-setting_name>>
+
+[id="plugins-{type}s-{plugin}-options"]
+==== Recursive_remove Configuration Options
+
+[cols="<,<,<",options="header",]
+|=======================================================================
+|Setting |Input type|Required
+| <<plugins-{type}s-{plugin}-matching_values>> |<<array,array>>|Yes
+| <<plugins-{type}s-{plugin}-excluded_keys>> |<<array,array>>|No
+|=======================================================================
+
+Also see <<plugins-{type}s-{plugin}-common-options>> for a list of options supported by all
+filter plugins.
+
+&nbsp;
+
+[id="plugins-{type}s-{plugin}-matching_values"]
+===== `matching_values`
+
+  * This is a required setting.
+  * Value type is <<array,array>>
+  * There is no default value for this setting.
+
+An array input of values to blacklist. Can consist of mixed types. +
+ +
+All numeric values in this array and the event will be compared as doubles, so a `0`-valued integer or long in this argument will remove any event fields possessing a `0.00`-valued float or double.
+
+[id="plugins-{type}s-{plugin}-excluded_keys"]
+===== `excluded_keys`
+
+  * Value type is <<array,array>>
+  * There is no default value for this setting.
+
+An optional array of string field names to exclude from blacklist value matching. If not specified, all fields will be searched. +
+ +
+This field supports Ruby nested fieldname strings, e.g.  (`"[rootfield][subfield][subsubfield]"`).
+
+
+// The full list of Value Types is here: 
+// https://www.elastic.co/guide/en/logstash/current/configuration-file-structure.html
+
+[id="plugins-{type}s-{plugin}-common-options"]
+include::{include_path}/{type}.asciidoc[]
